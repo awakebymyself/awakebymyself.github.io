@@ -6,7 +6,9 @@ tags:  tech
 author: Lzg
 ---
 
-* * *
+* content
+{:toc}
+
 
 **_Springboot之启动过程_**
 
@@ -34,17 +36,17 @@ public static ConfigurableApplicationContext run(Object[] sources, String[] args
   if (sources != null && sources.length > 0) {
 			this.sources.addAll(Arrays.asList(sources));
 		}
-    // 判断是否是web环境，根据servlet在不在类路径上，class.forname(servlet)
+        // 判断是否是web环境，根据servlet在不在类路径上，class.forname(servlet)
 		this.webEnvironment = deduceWebEnvironment();
-    //  设置容器初始化器材 ApplicationContextInitializer
+        //  设置容器初始化器材 ApplicationContextInitializer
 		setInitializers((Collection) getSpringFactoriesInstances(
 				ApplicationContextInitializer.class));
-    // 加载并设置applicationListener
+        // 加载并设置applicationListener
 		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
-    // 获取运行应用的Main类，方法如下
+        // 获取运行应用的Main类，方法如下
 		this.mainApplicationClass = deduceMainApplicationClass();
 
-    private Class<?> deduceMainApplicationClass() {
+private Class<?> deduceMainApplicationClass() {
   try {
     StackTraceElement[] stackTrace = new RuntimeException().getStackTrace();
     for (StackTraceElement stackTraceElement : stackTrace) {
