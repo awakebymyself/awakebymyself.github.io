@@ -252,7 +252,8 @@ if (this.conditionEvaluator.shouldSkip(configClass.getMetadata(), ConfigurationP
 
 接下来第二件事情就是循环调用condition的`match`方法。
 以`OnClassCondition`为例说一下：
-`@Override
+```java
+@Override
 	public final boolean matches(ConditionContext context,
 			AnnotatedTypeMetadata metadata) {
 		String classOrMethodName = getClassOrMethodName(metadata);
@@ -276,7 +277,8 @@ if (this.conditionEvaluator.shouldSkip(configClass.getMetadata(), ConfigurationP
 			throw new IllegalStateException(
 					"Error processing condition on " + getName(metadata), ex);
 		}
-	}`
+	}
+  ```
 首先进入`match`方法，第一行如果是class获取className，否则就是说class#methodName
 接下来就进入`getMatchOutcome`的实现,
 
