@@ -10,7 +10,7 @@ author: Lzg
 {:toc}
 
 
-**_Springboot之bean注入**
+**_Springboot之bean入库**
 
 ```java
 
