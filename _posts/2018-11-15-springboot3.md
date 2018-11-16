@@ -398,5 +398,15 @@ private void loadBeanDefinitionsForConfigurationClass(ConfigurationClass configC
 SpringBoot首先找到我们的启动类，解析类上的注解如ComponentScan, ImportResource注解然后找到这批
 bean，再将这批beandefinition循序遍历，判断是否是配置类，再递归解析，将自自身自身添加到容器中去，最后再将每个配置类的bean方法,import, importResource注册到容器。
 
-所欲在springboot启动过程中，`AbstractApplicationContext`的`	// Invoke factory processors registered as beans in the context.
+所以在springboot启动过程中，`AbstractApplicationContext`的`	// Invoke factory processors registered as beans in the context.
 				invokeBeanFactoryPostProcessors(beanFactory);` 所有的解析工作都已经完成，应用程序的bean和自动配置的bean都已经注册到容器当中了。
+
+最后说一下在spring调用`BeanFactoryPostProcessor`顺序是这样的，首先调用实现PriorityOrder接口的BeanDefinitionRegistryPostProcessors
+第二步是调用			// Next, invoke the BeanDefinitionRegistryPostProcessors that implement Ordered.
+第三步 调用其他没有实现顺序接口的BeanDefinitionRegistryPostProcessors
+第四步调用所有这些registryProcess的`postProcessBeanFactory`方法。
+在`ConfigurationClass`的这个方法里面将容器的配置类(是FullConfigurationClass的Bean)用cglib代理了，实现了protocol范围的bean。
+五： 找出所有的`BeanFactoryPostProcessor`，
+六：// First, invoke the BeanFactoryPostProcessors that implement PriorityOrdered.springboot属性占位符替换就是通过这个实现`PropertyPlaceholderConfigurerPropertyPlaceholderConfigurer`
+七：		// Next, invoke the BeanFactoryPostProcessors that implement Ordered.
+八：调用没实现顺序接口的 bean factory post processor
