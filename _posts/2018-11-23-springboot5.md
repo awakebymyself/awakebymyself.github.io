@@ -26,6 +26,9 @@ bean初始化过程:
 2. 下面会去找这个bean的构造器,通过`SmartInstantiationAwareBeanPostProcessor的determineCandidateConstructors`方法（see AutowiredAnnotationBeanPostProcessor）。
 如果构造函数有参数的话，会通过这个构造器初始化里面的对象，完成依赖注入,否则就用默认的无参构造器初始化。
 `AbstractAutowireCapableBeanFactory`
+
+寻找后续的构造器会去找这个类的又参数的构造函数，如果没有则返回Null
+
 ```java
 // Need to determine the constructor...
 		Constructor<?>[] ctors = determineConstructorsFromBeanPostProcessors(beanClass, beanName);
@@ -35,6 +38,8 @@ bean初始化过程:
 			return autowireConstructor(beanName, mbd, ctors, args);
 		}
     ```
+找到了构造器之后通过`autowireConstructor` 方法返回instance
+
 
 3. bean实例完之后调用`MergedBeanDefinitionPostProcessor`
 ,到这一步才只是将Bean实例处理，还没有设置属性(如果是指通过自动注入,构造器注入的话引用已经设置完成)
@@ -88,6 +93,10 @@ protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper
  ---
 
  ### 怎么解决循环依赖？
+
+*需要指出的是如果通过构造器注入的话，循环依赖解决不了，如果通过field自动注入的话则是可以解决的*
+
+
 `DefaultListableBeanFactory`有一个成员变量`
 ```java
 /** Names of beans that are currently in creation */
@@ -97,74 +106,111 @@ protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper
 
 在进行对象实例化之前,会将这个bean通过`beanName`设置到这个`Set`当中。
 
-后续在实例化对象之后，有如下一段代码:
+举个例子,对象A->B, 对象B-<A， 他们是通过构造器注入的，这是一个无法解决的循环依赖。
 
+为什么？
 
-
-
+从上文分析构造器注入的时候我们可以得知当去实例化A的时候，解析出有参数的构造器，参数是B,
+再去过去B, 解析B的构造器参数再去初始化A， 这时候在获取A就会报错，在代码路径`getSingleton`
+中实例化之前有一个判断
 ```java
-// Eagerly cache singletons to be able to resolve circular references
-// even when triggered by lifecycle interfaces like BeanFactoryAware.
-boolean earlySingletonExposure = (mbd.isSingleton() && this.allowCircularReferences &&
-    isSingletonCurrentlyInCreation(beanName));
-if (earlySingletonExposure) {
-  if (logger.isDebugEnabled()) {
-    logger.debug("Eagerly caching bean '" + beanName +
-        "' to allow for resolving potential circular references");
-  }
-  addSingletonFactory(beanName, new ObjectFactory<Object>() {
-    @Override
-    public Object getObject() throws BeansException {
-      return getEarlyBeanReference(beanName, mbd, bean);
-    }
-  });
-}
-```
-
-首先我们会进入这个判断语句，这里可以看到设置了一个`ObjectFactory`， 并保存在成员变量中
-```java
-protected void addSingletonFactory(String beanName, ObjectFactory<?> singletonFactory) {
-		Assert.notNull(singletonFactory, "Singleton factory must not be null");
-		synchronized (this.singletonObjects) {
-			if (!this.singletonObjects.containsKey(beanName)) {
-				this.singletonFactories.put(beanName, singletonFactory);
-				this.earlySingletonObjects.remove(beanName);
-				this.registeredSingletons.add(beanName);
-			}
+protected void beforeSingletonCreation(String beanName) {
+		if (!this.inCreationCheckExclusions.contains(beanName) && !this.singletonsCurrentlyInCreation.add(beanName)) {
+			throw new BeanCurrentlyInCreationException(beanName);
 		}
 	}
+```
+那么这里会抛出异常,因为在最开始初始化的时候已经将A先添加进去了。
+
+在最开始AbstractBeanFactory的`doGetBean`方法开头有如下判断
+```java
+final String beanName = transformedBeanName(name);
+  Object bean;
+
+  // Eagerly check singleton cache for manually registered singletons.
+  Object sharedInstance = getSingleton(beanName);
+  if (sharedInstance != null && args == null) {
+    if (logger.isDebugEnabled()) {
+      if (isSingletonCurrentlyInCreation(beanName)) {
+        logger.debug("Returning eagerly cached instance of singleton bean '" + beanName +
+            "' that is not fully initialized yet - a consequence of a circular reference");
+      }
+      else {
+        logger.debug("Returning cached instance of singleton bean '" + beanName + "'");
+      }
+    }
+    bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
+  }
   ```
 
-`ObjectFactory`的实现是这样的：
+点进去`getSingleton`方法:
 ```java
-new ObjectFactory<Object>() {
-       @Override
-       public Object getObject() throws BeansException {
-         return getEarlyBeanReference(beanName, mbd, bean);
-       }
-     });
+ 这里的boolean默认会为true
+ 通过属性注入的时候会发现我们通过singletonFactory会直接返回这个bean的earlyReference
+因为我们之前已经将beanName:A 和 ObjectFactory设置到`singletonFactories`里去了，所有这里直接返回A
 
-     /**
-   	 * Obtain a reference for early access to the specified bean,
-   	 * typically for the purpose of resolving a circular reference.
-   	 * @param beanName the name of the bean (for error handling purposes)
-   	 * @param mbd the merged bean definition for the bean
-   	 * @param bean the raw bean instance
-   	 * @return the object to expose as bean reference
-   	 */
-   	protected Object getEarlyBeanReference(String beanName, RootBeanDefinition mbd, Object bean) {
-   		Object exposedObject = bean;
-   		if (bean != null && !mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
-   			for (BeanPostProcessor bp : getBeanPostProcessors()) {
-   				if (bp instanceof SmartInstantiationAwareBeanPostProcessor) {
-   					SmartInstantiationAwareBeanPostProcessor ibp = (SmartInstantiationAwareBeanPostProcessor) bp;
-   					exposedObject = ibp.getEarlyBeanReference(exposedObject, beanName);
-   					if (exposedObject == null) {
-   						return null;
-   					}
-   				}
-   			}
-   		}
-   		return exposedObject;
-   	}
+protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+		Object singletonObject = this.singletonObjects.get(beanName);
+		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+			synchronized (this.singletonObjects) {
+				singletonObject = this.earlySingletonObjects.get(beanName);
+				if (singletonObject == null && allowEarlyReference) {
+					ObjectFactory<?> singletonFactory = this.singletonFactories.get(beanName);
+					if (singletonFactory != null) {
+						singletonObject = singletonFactory.getObject();
+						this.earlySingletonObjects.put(beanName, singletonObject);
+						this.singletonFactories.remove(beanName);
+					}
+				}
+			}
+		}
+		return (singletonObject != NULL_OBJECT ? singletonObject : null);
+	}
+
 ```
+
+  那么问题来了，为什么通过构造器的注入的时候不行呢？
+  因为在创建bean的代码路径上是这样的:
+
+ 1. `createBeanInstance`先创建bean实例
+
+ 2. 再给bean设置一个`allowEarlyReferenceBeanFactory`
+ ```java
+ addSingletonFactory(beanName, new ObjectFactory<Object>() {
+				@Override
+				public Object getObject() throws BeansException {
+					return getEarlyBeanReference(beanName, mbd, bean);
+				}
+			});
+```
+3.再去初始化bean的属性`populateBean`
+
+如果我们通过构造器注入，那么在第一步的时候就已经去通过构造器参数再去容器中获取B, 这时还没有将A添加到
+这个factoryMap中，所有上文的的getSingleton就会返回Null, 然后走到后头就会报错。
+
+如果是通过属性注入则情况刚刚相反，我们会通过注册的`factoryBean`获取`A`的earlyReference,完成`B`的
+初始化，再完成A自身的初始化。
+
+疑问解决了，那么我们看一下怎么实现earlyReference的？
+其实还是通过`SmartInstantiationAwareBeanPostProcessor`的`getEarlyBeanReference`
+
+`	Object getEarlyBeanReference(Object bean, String beanName) throws BeansException;`
+
+里面的实现都是直接返回这个`bean`。
+
+综上这就是spring如何解决循环依赖的问题。
+
+
+
+### 如何创建单例和protptype的bean
+
+  如果是单例走`getSingleton`方法
+
+获取单例的时候会从类成员中先回去，有则返回，没有就调用`createBean`生成-再缓存返回
+```java
+/** Cache of singleton objects: bean name --> bean instance */
+private final Map<String, Object> singletonObjects = new ConcurrentHashMap<String, Object>(256);
+```
+
+如果是原型的
+`则直接调用createBean` 生成新的
