@@ -38,11 +38,7 @@ bean初始化过程:
 			return autowireConstructor(beanName, mbd, ctors, args);
 		}
 ```
-
-找到了构造器之后通过`autowireConstructor` 方法返回instance
-
-
-3. bean实例完之后调用`MergedBeanDefinitionPostProcessor`, 到这一步才只是将Bean实例处理，还没有设置属性(如果是指通过自动注入,构造器注入的话引用已经设置完成)
+3.找到了构造器之后通过`autowireConstructor` 方法返回instance,bean实例完之后调用`MergedBeanDefinitionPostProcessor`, 到这一步才只是将Bean实例处理，还没有设置属性(如果是指通过自动注入,构造器注入的话引用已经设置完成)
 
 ```java
 if (instanceWrapper == null) {
@@ -61,7 +57,7 @@ if (instanceWrapper == null) {
 ```
 
 
-4. 如果通过autowire设置依赖，找到`InstantiationAwareBeanPostProcessor`接口实现, 具体通过`AutowiredAnnotationBeanPostProcessor` beanPostProcessor实现， 本质还是找到需要的bean,再去容器中`getBean` 属性注入完成之后调用初始化方法
+4.如果通过autowire设置依赖，找到`InstantiationAwareBeanPostProcessor`接口实现, 具体通过`AutowiredAnnotationBeanPostProcessor` beanPostProcessor实现， 本质还是找到需要的bean,再去容器中`getBean` 属性注入完成之后调用初始化方法
 
 ```java
 protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper bw) {
@@ -80,7 +76,7 @@ protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper
 ```
 
 
-5. 等实例初始化完成（依赖注入完成）之后 先设置bean的一系列`aware`接口
+5.等实例初始化完成（依赖注入完成）之后 先设置bean的一系列`aware`接口
 
   ---> （不是合成的,非系统自己的）`beanPostProcessor`的`postProcessBeforeInitialization`
 
