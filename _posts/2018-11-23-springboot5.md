@@ -226,6 +226,7 @@ private final Map<String, Object> singletonObjects = new ConcurrentHashMap<Strin
 和属性自动注入一样，拿到所有依赖的bean，去容器中寻找。
 在`DefaultListableBeanFactory`的`doResolveDependency`中
 有如下代码
+
 ```java
 Object value = getAutowireCandidateResolver().getSuggestedValue(descriptor);
 			if (value != null) {
