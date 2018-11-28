@@ -92,7 +92,7 @@ protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper
 
  ---
 
- ### 怎么解决循环依赖？
+### 怎么解决循环依赖？
 
 *需要指出的是如果通过构造器注入的话，循环依赖解决不了，如果通过field自动注入的话则是可以解决的*
 
@@ -122,7 +122,11 @@ protected void beforeSingletonCreation(String beanName) {
 ```
 那么这里会抛出异常,因为在最开始初始化的时候已经将A先添加进去了。
 
-在最开始AbstractBeanFactory的`doGetBean`方法开头有如下判断
+
+*那么为什么属性注入是可以的呢？*
+
+回到最开始AbstractBeanFactory的`doGetBean`方法开头有如下判断
+
 ```java
 final String beanName = transformedBeanName(name);
   Object bean;
@@ -141,14 +145,16 @@ final String beanName = transformedBeanName(name);
     }
     bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
   }
-  ```
+  ....
+```
 
 点进去`getSingleton`方法:
-```java
- 这里的boolean默认会为true
- 通过属性注入的时候会发现我们通过singletonFactory会直接返回这个bean的earlyReference
-因为我们之前已经将beanName:A 和 ObjectFactory设置到`singletonFactories`里去了，所有这里直接返回A
 
+这里的参数boolean默认会为true
+
+通过属性注入的时候会发现我们通过singletonFactory会直接返回这个bean的earlyReference
+因为我们之前已经将beanName:A 和 ObjectFactory设置到`singletonFactories`里去了，所有这里直接返回A
+```java
 protected Object getSingleton(String beanName, boolean allowEarlyReference) {
 		Object singletonObject = this.singletonObjects.get(beanName);
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
