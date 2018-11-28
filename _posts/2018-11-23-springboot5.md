@@ -187,7 +187,7 @@ protected Object getSingleton(String beanName, boolean allowEarlyReference) {
 				}
 			});
 ```
-3.再去初始化bean的属性`populateBean`
+3. 再去初始化bean的属性`populateBean`
 
 如果我们通过构造器注入，那么在第一步的时候就已经去通过构造器参数再去容器中获取B, 这时还没有将A添加到
 这个factoryMap中，所有上文的的getSingleton就会返回Null, 然后走到后头就会报错。
@@ -218,3 +218,27 @@ private final Map<String, Object> singletonObjects = new ConcurrentHashMap<Strin
 
 如果是原型的
 `则直接调用createBean` 生成新的
+
+
+### 怎么注入环境变量的
+
+
+和属性自动注入一样，拿到所有依赖的bean，去容器中寻找。
+在`DefaultListableBeanFactory`的`doResolveDependency`中
+有如下代码
+```java
+Object value = getAutowireCandidateResolver().getSuggestedValue(descriptor);
+			if (value != null) {
+				if (value instanceof String) {
+					String strVal = resolveEmbeddedValue((String) value);
+					BeanDefinition bd = (beanName != null && containsBean(beanName) ? getMergedBeanDefinition(beanName) : null);
+					value = evaluateBeanDefinitionString(strVal, bd);
+				}
+				TypeConverter converter = (typeConverter != null ? typeConverter : getTypeConverter());
+				return (descriptor.getField() != null ?
+						converter.convertIfNecessary(value, type, descriptor.getField()) :
+						converter.convertIfNecessary(value, type, descriptor.getMethodParameter()));
+			}
+```
+
+底层会通过之前设置的`StringResolver`去寻找对应的值，然后设置进去。
