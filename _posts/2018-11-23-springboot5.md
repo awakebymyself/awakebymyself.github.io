@@ -42,8 +42,8 @@ bean初始化过程:
 找到了构造器之后通过`autowireConstructor` 方法返回instance
 
 
-3. bean实例完之后调用`MergedBeanDefinitionPostProcessor`
-,到这一步才只是将Bean实例处理，还没有设置属性(如果是指通过自动注入,构造器注入的话引用已经设置完成)
+3. bean实例完之后调用`MergedBeanDefinitionPostProcessor`, 到这一步才只是将Bean实例处理，还没有设置属性(如果是指通过自动注入,构造器注入的话引用已经设置完成)
+
 ```java
 if (instanceWrapper == null) {
 			instanceWrapper = createBeanInstance(beanName, mbd, args);
@@ -77,7 +77,6 @@ protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper
 				}
 			}
 		}
-
 ```
 
 
