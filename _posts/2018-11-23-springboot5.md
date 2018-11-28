@@ -37,7 +37,8 @@ bean初始化过程:
 				mbd.hasConstructorArgumentValues() || !ObjectUtils.isEmpty(args))  {
 			return autowireConstructor(beanName, mbd, ctors, args);
 		}
-    ```
+```
+
 找到了构造器之后通过`autowireConstructor` 方法返回instance
 
 
@@ -57,10 +58,11 @@ if (instanceWrapper == null) {
 				mbd.postProcessed = true;
 			}
 		}
-    ```
+```
 
-4. 如果通过autowire设置依赖，找到`InstantiationAwareBeanPostProcessor`接口实现, 具体通过`AutowiredAnnotationBeanPostProcessor` beanPostProcessor实现， 本质还是找到需要的bean,再去容器中`getBean`
-属性注入完成之后调用初始化方法
+
+4. 如果通过autowire设置依赖，找到`InstantiationAwareBeanPostProcessor`接口实现, 具体通过`AutowiredAnnotationBeanPostProcessor` beanPostProcessor实现， 本质还是找到需要的bean,再去容器中`getBean` 属性注入完成之后调用初始化方法
+
 ```java
 protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper bw) {
 	    ...省略
@@ -75,6 +77,7 @@ protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper
 				}
 			}
 		}
+
 ```
 
 
@@ -90,7 +93,7 @@ protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper
 
 在所有对象都完成之后，再调用其中实现了接口`SmartInitializingSingleton`的bean，执行方法。
 
- ---
+---
 
 ### 怎么解决循环依赖？
 
