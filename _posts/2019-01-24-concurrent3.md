@@ -74,6 +74,7 @@ final boolean acquireQueued(final Node node, int arg) {
               // 拿到这个node的前置节点
                final Node p = node.predecessor();
                // 如果它的前置节点是等待队列的头节点并且accquire成功，表示获取到锁
+               // 头节点表示获取同步状态成功的节点
                if (p == head && tryAcquire(arg)) {
                   // 将这个获取成功的节点设置为头节点
                    setHead(node);
@@ -82,7 +83,7 @@ final boolean acquireQueued(final Node node, int arg) {
                    return interrupted;
                }
                // 第一个语句没有进入，则走到这步，代码见 ↓ , 方法如果返回false则继续下一次循环，否则
-               //通过LockSupport去park当前线程线程，并返回中断状态
+               //通过LockSupport去park当前线程线程，并检查中断状态返回
                if (shouldParkAfterFailedAcquire(p, node) &&
                    parkAndCheckInterrupt())
                    interrupted = true;
@@ -122,9 +123,41 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
             * need a signal, but don't park yet.  Caller will need to
             * retry to make sure it cannot acquire before parking.
             */
-           CAS地将pred节点状态设置为singal
+            CAS地将pred节点状态设置为singal
            compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
        }
        return false;
    }
 ```
+
+综上就是获取独占锁的内部实现了，可以看到使用的就是`CAS`和`volatile`去原子的更新节点，通过自旋去实现多次尝试，通过`park`去阻塞当前线程。
+
+
+在解读了独占锁的获取源码之后，我们再看下释放的操作`release`
+```java
+// 子类重写抽象方法，返回true表示释放成功
+if (tryRelease(arg)) {
+         Node h = head;
+         if (h != null && h.waitStatus != 0)
+         // 唤醒后置节点,以便重新尝试获取同步状态
+             unparkSuccessor(h);
+         return true;
+     }
+     return false;
+```
+
+
+> 获取共享锁的实现大体上和独占锁差不多，区别就是共享锁通过tryAcquireShared>0 表示获取成功，
+释放的时候子类重写tryReleaseShared的时候需要保证原子的更新状态，因为可能多个线程去释放,一般通过自旋+CAS
+
+
+***AQS之响应中断锁***
+
+实现：
+
+
+***AQS之超时锁***
+
+通过`tryAcquireNanos`, 底层调用`doAcquireNanos`， 超时锁响应中断
+
+实现：大体和独占锁获取相同， 在超时锁获取过程中
