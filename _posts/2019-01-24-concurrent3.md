@@ -81,6 +81,8 @@ final boolean acquireQueued(final Node node, int arg) {
                    failed = false;
                    return interrupted;
                }
+               // 第一个语句没有进入，则走到这步，代码见 ↓ , 方法如果返回false则继续下一次循环，否则
+               //通过LockSupport去park当前线程线程，并返回中断状态
                if (shouldParkAfterFailedAcquire(p, node) &&
                    parkAndCheckInterrupt())
                    interrupted = true;
@@ -92,4 +94,37 @@ final boolean acquireQueued(final Node node, int arg) {
    }
 ```
 
-如果还是获取失败的话
+```java
+private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
+       // node节点的状态位， 默认初始为0
+       int ws = pred.waitStatus;
+       // 如果是signal返回true，需要park
+       if (ws == Node.SIGNAL)
+           /*
+            * This node has already set status asking a release
+            * to signal it, so it can safely park.
+            */
+           return true;
+       // 状态位Canceled, 需要取消
+       if (ws > 0) {
+           /*
+            * Predecessor was cancelled. Skip over predecessors and
+            * indicate retry.
+            */
+           遍历node节点的前置节点知道其ws不是取消状态，并将这个节点的next引用指向自己
+           do {
+               node.prev = pred = pred.prev;
+           } while (pred.waitStatus > 0);
+           pred.next = node;
+       } else {
+           /*
+            * waitStatus must be 0 or PROPAGATE.  Indicate that we
+            * need a signal, but don't park yet.  Caller will need to
+            * retry to make sure it cannot acquire before parking.
+            */
+           CAS地将pred节点状态设置为singal
+           compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
+       }
+       return false;
+   }
+```
