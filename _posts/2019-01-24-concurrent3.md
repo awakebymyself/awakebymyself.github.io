@@ -153,11 +153,73 @@ if (tryRelease(arg)) {
 
 ***AQS之响应中断锁***
 
-实现：
+实现：`acquireInterruptibly`的`doAcquireInterruptibly`方法
+```java
+private void doAcquireInterruptibly(int arg)
+      throws InterruptedException {
+      final Node node = addWaiter(Node.EXCLUSIVE);
+      boolean failed = true;
+      try {
+          for (;;) {
+              final Node p = node.predecessor();
+              if (p == head && tryAcquire(arg)) {
+                  setHead(node);
+                  p.next = null; // help GC
+                  failed = false;
+                  return;
+              }
+              // 整体和独占锁类似，在失败的时候会检查中断的状态位，如果线程被中断了则抛出异常
+              if (shouldParkAfterFailedAcquire(p, node) &&
+                  parkAndCheckInterrupt())
+                  throw new InterruptedException();
+          }
+      } finally {
+          if (failed)
+              cancelAcquire(node);
+      }
+  }
+```
 
 
 ***AQS之超时锁***
 
 通过`tryAcquireNanos`, 底层调用`doAcquireNanos`， 超时锁响应中断
 
-实现：大体和独占锁获取相同， 在超时锁获取过程中
+实现：大体和独占锁获取相同， 在超时锁获取过程中如果获取成功则和同步锁一样，失败的话则会计算
+获取锁的时间的deadline,如果小于0则直接返回false, 如果大于1000ms则进行park，小于的话则进行自旋重新尝试获取。
+```java
+private boolean doAcquireNanos(int arg, long nanosTimeout)
+          throws InterruptedException {
+      // 超时时间小于0直接false
+      if (nanosTimeout <= 0L)
+          return false;
+      final long deadline = System.nanoTime() + nanosTimeout;
+      final Node node = addWaiter(Node.EXCLUSIVE);
+      boolean failed = true;
+      try {
+          for (;;) {
+              final Node p = node.predecessor();
+              if (p == head && tryAcquire(arg)) {
+                  setHead(node);
+                  p.next = null; // help GC
+                  failed = false;
+                  return true;
+              }
+              // 超时剩余 的时间
+              nanosTimeout = deadline - System.nanoTime();
+              if (nanosTimeout <= 0L)
+                  return false;
+              if (shouldParkAfterFailedAcquire(p, node) &&
+                  nanosTimeout > spinForTimeoutThreshold)
+                  // 剩余的时间大于一个阈值的时候就park住，让出cpu资源，否则就进行快速的自旋
+                  LockSupport.parkNanos(this, nanosTimeout);
+              // 响应中断的处理
+              if (Thread.interrupted())
+                  throw new InterruptedException();
+          }
+      } finally {
+          if (failed)
+              cancelAcquire(node);
+      }
+  }
+```  
