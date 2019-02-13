@@ -211,7 +211,7 @@ private boolean doAcquireNanos(int arg, long nanosTimeout)
                   return false;
               if (shouldParkAfterFailedAcquire(p, node) &&
                   nanosTimeout > spinForTimeoutThreshold)
-                  // 剩余的时间大于一个阈值的时候就park住，让出cpu资源，否则就进行快速的自旋
+                  // 剩余的时间大于一个阈值的时候就park住，让出cpu资源，否则就进行
                   LockSupport.parkNanos(this, nanosTimeout);
               // 响应中断的处理
               if (Thread.interrupted())
@@ -223,3 +223,83 @@ private boolean doAcquireNanos(int arg, long nanosTimeout)
       }
   }
 ```  
+
+---
+
+****LockSupport****
+
+从上面的分析中我们会经常用到这么一个工具类`LockSupport`，用来阻塞或者是唤醒某个线程, 它也因此成为了构建同步工具的基础。
+
+`park`表示阻塞， `unpark`则是唤醒，同时还提供限时的阻塞`parkNanos`和`parkUntil`，以及在dump线程的时候能够提供观察的对象参数`Blocker`
+
+
+---
+
+****Condition****
+
+使用方法:
+```java
+Lock lock = new ReentrantLock();
+    Condition condition = lock.newCondition();
+
+    lock.lock();
+
+    try {
+        condition.await();
+    } catch (InterruptedException e) {
+
+    } finally {
+        lock.unlock();
+    }
+```
+
+`condition`接口类似于Object的`wait`,`notify`, `notifyall`。 相同的在于使用的时候需要先获取锁，
+在等待的时候会释放锁。不过condition接口还提供了不响应中断的等待。
+
+`实现方式:`
+内部同样维护了一个等待队列，每一个conditionObject就有一个队列。复用了AQS的的Node节点。
+
+先看下`await`的实现：
+
+```java
+public final void await() throws InterruptedException {
+         // 检查中断状态位
+         if (Thread.interrupted())
+             throw new InterruptedException();
+         //将当前线程构建成一个condition节点加入等待队列
+         Node node = addConditionWaiter();
+         // 释放同步状态（同步队列的头节点），也就是释放锁,唤醒同步队列的后继节点
+         int savedState = fullyRelease(node);
+         int interruptMode = 0;
+         // signal之后会在同步队列中，则退出while循环
+         while (!isOnSyncQueue(node)) {
+             LockSupport.park(this);
+             if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
+                 break;
+         }
+         // 竞争同步状态
+         if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
+             interruptMode = REINTERRUPT;
+         if (node.nextWaiter != null) // clean up if cancelled
+             unlinkCancelledWaiters();
+         if (interruptMode != 0)
+             reportInterruptAfterWait(interruptMode);
+     }
+```
+
+`signal`:
+
+调用`condition.signal()`将会唤醒在等待队列等待时间最长的节点（头节点），在唤醒前会将节点移动到同步队列中。
+```java
+public final void signal() {
+          //必须要先获取锁才能唤醒
+          if (!isHeldExclusively())
+              throw new IllegalMonitorStateException();
+          // 唤醒头节点,移动到同步队列中，并使用locksupport唤醒，并重新加入到同步状态的竞争中，直到成功获取同步状态,await方法才会返回。
+          Node first = firstWaiter;
+          if (first != null)
+              doSignal(first);
+      }
+```      
+
+`signalAll`:相当于等待队列中对每个节点使用`singal`，效果就是将每个节点加入到同步队列中并唤醒。
