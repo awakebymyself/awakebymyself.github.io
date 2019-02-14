@@ -221,4 +221,4 @@ Exchanger<String> exchanger = new Exchanger<>();
            });
 ```
 
-  实现方式：
+  实现方式：see [实现原理](https://www.jianshu.com/p/c523826b2c94)
