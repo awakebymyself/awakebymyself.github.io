@@ -22,7 +22,7 @@ author: Lzg
 3. 线程池(ForkJoinPool...
 4. 原子变量(AtomicInteger...
 5. Exector框架(Exectors
-
+6. 并发容器
 > 其中锁和同步工具底层实现都是依赖于AQS， 由此可见其重要性
 
 简单来说`AQS`就是通过int类型的状态来边上同步状态的获取以及释放，内部持有FIFO的等待队列，
